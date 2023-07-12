@@ -1,47 +1,29 @@
+from Event import Event
+from Notificator import Notificator
+from Storage import Storage
+import time
 from dotenv import load_dotenv
 import os
-import requests
-import selectorlib
+
 
 load_dotenv()
-
-URL = os.getenv('TOURS_URL')
-
-
-def get_page(url: str) -> str:
-    response = requests.get(url)
-
-    return response.text
-
-
-def extract_tours (source):
-    extractor = selectorlib.Extractor.from_yaml_file("extract.yml")
-    return extractor.extract(source)["tours"]
-
-
-def notify(message):
-    print(f"You Have a Tour!!! \n {message}")
-
-
-def store(tour: str):
-    with open("data.txt", "a") as file:
-        file.write(tour + "\n")
-
-
-def is_tour_stored(tour: str) -> bool:
-    with open("data.txt", 'r') as file:
-        tour_list = file.read()
-    return tour in tour_list
-
+tours_url = os.getenv('TOURS_URL')
+event = Event()
+storage = Storage('scraper-app10.db')
+notificator = Notificator()
 
 if __name__ == "__main__":
-    page = get_page(URL)
-    tours = extract_tours(page)
+    while True:
+        page = event.get_page(tours_url)
+        tours = event.extract_tour(page)
 
-    if tours == 'No upcoming tours':
-        exit('')
+        if 'No upcoming tours' in tours:
+            time.sleep(2)
+            continue
 
-    if not is_tour_stored(tours):
-        notify(tours)
-        store(tours)
+        tours = event.preprocess_data(tours)
+        if tours and not storage.is_tour_stored(tours):
+            notificator.notify(str(tours))
+            result = storage.store(tours)
 
+        time.sleep(2)
